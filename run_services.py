@@ -19,6 +19,16 @@ os.environ["DEBUG"] = "true"
 from dotenv import load_dotenv
 
 env_path = Path(__file__).parent / ".env.local"
+fallback_env_path = Path(__file__).parent / "env_local_work.txt"
+
+if not env_path.exists():
+    if fallback_env_path.exists():
+        print("Creating .env.local from env_local_work.txt...", file=sys.stderr)
+        env_path.write_text(fallback_env_path.read_text())
+    else:
+        print("env_local_work.txt not found. No environment file loaded.", file=sys.stderr)
+
+
 if env_path.exists():
     load_dotenv(env_path, override=True)
 
@@ -138,7 +148,7 @@ class ServiceManager:
             )
             
             self.processes[service_name] = process
-            print(f"✓ {service_name} started (PID: {process.pid})", file=sys.stderr)
+            print(f" {service_name} started (PID: {process.pid})", file=sys.stderr)
             return True
             
         except Exception as e:
@@ -157,7 +167,7 @@ class ServiceManager:
         try:
             process.terminate()
             process.wait(timeout=5)
-            print(f"✓ {service_name} stopped", file=sys.stderr)
+            print(f" {service_name} stopped", file=sys.stderr)
             del self.processes[service_name]
             return True
         except subprocess.TimeoutExpired:
@@ -184,8 +194,8 @@ class ServiceManager:
             print(f"WARNING: Failed to start: {', '.join(failed)}", file=sys.stderr)
             return len(failed) < len(self.SERVICES)
         
-        print("✓ All services started successfully!", file=sys.stderr)
-        return True
+        print(" All services started successfully!", file=sys.stderr)
+        return True 
     
     def stop_all(self) -> bool:
         """Stop all running services"""
@@ -194,7 +204,7 @@ class ServiceManager:
         for service_name in list(self.processes.keys()):
             self.stop_service(service_name)
         
-        print("✓ All services stopped", file=sys.stderr)
+        print(" All services stopped", file=sys.stderr)
         return True
     
     def list_services(self) -> None:
@@ -203,7 +213,7 @@ class ServiceManager:
         print("-" * 60, file=sys.stderr)
         
         for service_name, config in self.SERVICES.items():
-            running = "✓ RUNNING" if service_name in self.processes else "  stopped"
+            running = " RUNNING" if service_name in self.processes else "  stopped"
             print(f"{service_name:20} {config['description']:30} [Port: {config['port']}] {running}", file=sys.stderr)
     
     def show_help(self) -> None:
