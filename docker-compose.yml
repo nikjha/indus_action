@@ -1,0 +1,134 @@
+version: "3.9"
+services:
+  api-gateway:
+    build: ./services/api_gateway
+    container_name: api-gateway
+    ports:
+      - "8000:8000"
+    depends_on:
+      - auth-service
+      - user-service
+      - task-service
+    environment:
+      AUTH_SECRET: dev-secret
+      DOCS_USER: docs
+      DOCS_PASS: docs123
+    networks:
+      - appnet
+  auth-service:
+    build: ./services/auth_service
+    container_name: auth-service
+    ports:
+      - "8001:8001"
+    environment:
+      AUTH_SECRET: dev-secret
+      DOCS_USER: docs
+      DOCS_PASS: docs123
+    networks:
+      - appnet
+  user-service:
+    build: ./services/user_service
+    container_name: user-service
+    ports:
+      - "8002:8002"
+    environment:
+      DB_HOST: db
+      DB_USER: app
+      DB_PASSWORD: app
+      DB_NAME: appdb
+      DOCS_USER: docs
+      DOCS_PASS: docs123
+    networks:
+      - appnet
+  task-service:
+    build: ./services/task_service
+    container_name: task-service
+    ports:
+      - "8003:8003"
+    depends_on:
+      - eligibility-engine
+      - user-service
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      AUTH_SECRET: dev-secret
+      DB_HOST: db
+      DB_USER: app
+      DB_PASSWORD: app
+      DB_NAME: appdb
+      DOCS_USER: docs
+      DOCS_PASS: docs123
+    networks:
+      - appnet
+  eligibility-engine:
+    build: ./services/eligibility_engine
+    container_name: eligibility-engine
+    ports:
+      - "8004:8004"
+    depends_on:
+      - user-service
+      - redis
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DOCS_USER: docs
+      DOCS_PASS: docs123
+    networks:
+      - appnet
+  worker:
+    build: ./services/worker
+    container_name: worker
+    depends_on:
+      - eligibility-engine
+      - redis
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    networks:
+      - appnet
+  postgres:
+    image: postgres:15
+    container_name: db
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: appdb
+    ports:
+      - "5433:5433"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - appnet
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - appnet
+  frontend:
+    image: nginx:alpine
+    container_name: frontend
+    ports:
+      - "8080:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    depends_on:
+      - api-gateway
+    networks:
+      - appnet
+  frontend-vite:
+    build: ./frontend-vite
+    container_name: frontend-vite
+    ports:
+      - "8081:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - appnet
+networks:
+  appnet:
+    driver: bridge
+volumes:
+  pgdata:
